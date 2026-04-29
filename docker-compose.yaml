@@ -1,0 +1,113 @@
+version: "3.9"
+
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://0.0.0.0:29092,CONTROLLER://kafka:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_NUM_PARTITIONS: 2
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      # ── Short-term retention: 6 hours ──────────────────────────────────
+      KAFKA_LOG_RETENTION_MS: 21600000          # 6h in milliseconds
+      KAFKA_LOG_RETENTION_BYTES: 1073741824     # 1 GB per partition cap
+      KAFKA_LOG_SEGMENT_BYTES: 104857600        # 100 MB segments (faster cleanup)
+
+    healthcheck:
+      test: kafka-topics --bootstrap-server kafka:9092 --list || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+    volumes:
+      - kafka_data:/var/lib/kafka/data  # ← persistent; survives container restart
+
+    networks:
+      - spark-kafka-net
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - spark-kafka-net
+
+  spark:
+    image: apache/spark:3.4.2-python3
+    container_name: spark
+    hostname: spark
+    user: root
+    command: bash -c "curl -so /opt/spark/jars/hadoop-aws-3.3.4.jar https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar && curl -so /opt/spark/jars/aws-java-sdk-bundle-1.12.262.jar https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar && sleep infinity"
+    ports:
+      - "4040:4040"
+      - "7077:7077"
+    environment:
+      - SPARK_MODE=master
+      # ── AWS credentials for S3 writes ──────────────────────────────────
+      # Use an .env file or Docker secrets in production — never hardcode keys
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+    volumes:
+      - ./:/opt/spark-apps
+      - spark_checkpoints:/tmp/checkpoints  # ← fast recovery across restarts
+
+    depends_on:
+      - kafka
+    networks:
+      - spark-kafka-net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m  # down from 512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data  # ← already in your compose
+
+    networks:
+      - spark-kafka-net
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: kibana
+    depends_on:
+      - elasticsearch
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    networks:
+      - spark-kafka-net
+
+# ── Named volumes ───────────────────────────────────────────────────────────
+volumes:
+  kafka_data:            # Kafka log segments (6h retention enforced above)
+  spark_checkpoints:     # Spark structured streaming offsets + state
+  es_data:               # Elasticsearch indices (1–2 day window aggs)
+
+networks:
+  spark-kafka-net:
+    driver: bridge

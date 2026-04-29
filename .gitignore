@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual env
+venv/
+env/
+
+# Data files
+*.csv
+*.json
+*.parquet
+*.zip
+
+# Models
+*.pkl
+*.h5
+*.pt
+
+# OS / IDE
+.DS_Store
+.vscode/
