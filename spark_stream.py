@@ -29,7 +29,8 @@ spark.sparkContext.setLogLevel("WARN")
 # =====================================================
 # S3 BASE PATH
 # =====================================================
-S3_BASE = "s3a://crypto-data-pk/aggregates"   # s3a:// — required for Spark/Hadoop
+# s3a:// — required for Spark/Hadoop
+S3_BASE = "s3a://crypto-data-pk/aggregates"
 
 # =====================================================
 # KAFKA SCHEMA
@@ -93,7 +94,8 @@ enriched_df = dedup_df \
     .withColumn("latency_seconds",
                 unix_timestamp("ingestion_time") - unix_timestamp("event_time")) \
     .withColumn("quality_score",
-                when((col("latency_seconds") < 5) & (col("spread_pct") < 1), 100)
+                when((col("latency_seconds") < 5) &
+                     (col("spread_pct") < 1), 100)
                 .when((col("latency_seconds") < 10) & (col("spread_pct") < 5), 80)
                 .otherwise(50)) \
     .withColumn("is_suspicious_spread", col("spread_pct") > 10)
@@ -111,6 +113,8 @@ base_stream_15m = final_df.withWatermark("event_time", "11 minutes")
 # =====================================================
 # WRITE TO ELASTICSEARCH
 # =====================================================
+
+
 def write_to_es(batch_df, batch_id, index_name):
     batch_df.write \
         .format("org.elasticsearch.spark.sql") \
@@ -124,6 +128,8 @@ def write_to_es(batch_df, batch_id, index_name):
 # =====================================================
 # WRITE TO S3 (Parquet, Hive-partitioned by date)
 # =====================================================
+
+
 def write_to_s3(batch_df, batch_id, window_label):
     """
     Writes a micro-batch to S3 as Parquet, partitioned by year/month/day.
@@ -144,9 +150,9 @@ def write_to_s3(batch_df, batch_id, window_label):
         return   # skip empty micro-batches (e.g. during low-volume periods)
 
     batch_df \
-        .withColumn("year",  year(col("window_start_ts").cast("timestamp"))) \
+        .withColumn("year", year(col("window_start_ts").cast("timestamp"))) \
         .withColumn("month", month(col("window_start_ts").cast("timestamp"))) \
-        .withColumn("day",   dayofmonth(col("window_start_ts").cast("timestamp"))) \
+        .withColumn("day", dayofmonth(col("window_start_ts").cast("timestamp"))) \
         .coalesce(1) \
         .write \
         .mode("append") \
@@ -156,6 +162,8 @@ def write_to_s3(batch_df, batch_id, window_label):
 # =====================================================
 # WINDOW AGG + DUAL SINK FUNCTION
 # =====================================================
+
+
 def create_window_agg(stream_df, window_duration, es_index,
                       checkpoint_dir, trigger_sec, window_label):
     """
@@ -203,16 +211,17 @@ def create_window_agg(stream_df, window_duration, es_index,
 
     return query
 
+
 # =====================================================
 # START STREAMS
 # =====================================================
-q1m  = create_window_agg(
-    base_stream_1m, "1 minute",  "crypto_agg_1m",
-    "/tmp/checkpoints/agg_1m",  "2 seconds",  "1m"
+q1m = create_window_agg(
+    base_stream_1m, "1 minute", "crypto_agg_1m",
+    "/tmp/checkpoints/agg_1m", "2 seconds", "1m"
 )
-q5m  = create_window_agg(
+q5m = create_window_agg(
     base_stream_5m, "5 minutes", "crypto_agg_5m",
-    "/tmp/checkpoints/agg_5m",  "5 seconds",  "5m"
+    "/tmp/checkpoints/agg_5m", "5 seconds", "5m"
 )
 q15m = create_window_agg(
     base_stream_15m, "15 minutes", "crypto_agg_15m",

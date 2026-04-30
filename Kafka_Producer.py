@@ -30,17 +30,22 @@ producer = KafkaProducer(
     max_in_flight_requests_per_connection=1,
 )
 
+
 def on_send_success(metadata):
     pass  # suppress noisy logging; remove to debug partition assignments
 
+
 def on_send_error(exc):
     print(f"❌ Kafka delivery failed: {exc}")
+
 
 ws = None
 
 # ------------------------
 # WebSocket handlers
 # ------------------------
+
+
 def on_message(ws, message):
     data = json.loads(message)
     msg_type = data.get("type")
@@ -74,15 +79,15 @@ def on_message(ws, message):
 
     event = {
         "product_id": data.get("product_id"),
-        "price":      safe_float("price"),
-        "bid":        safe_float("best_bid"),
-        "ask":        safe_float("best_ask"),
+        "price": safe_float("price"),
+        "bid": safe_float("best_bid"),
+        "ask": safe_float("best_ask"),
         "volume_24h": safe_float("volume_24h"),
 
         # Rolling 24h OHLC — useful for Kibana range/trend panels
-        "open_24h":   safe_float("open_24h"),
-        "high_24h":   safe_float("high_24h"),
-        "low_24h":    safe_float("low_24h"),
+        "open_24h": safe_float("open_24h"),
+        "high_24h": safe_float("high_24h"),
+        "low_24h": safe_float("low_24h"),
 
         # Coinbase sends ISO 8601 UTC: "2026-03-20T12:00:00.123456Z"
         # Spark TimestampType parses this format correctly as-is.
