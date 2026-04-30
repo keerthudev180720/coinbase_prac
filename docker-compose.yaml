@@ -51,29 +51,28 @@ services:
       - spark-kafka-net
 
   spark:
-    image: apache/spark:3.4.2-python3
-    container_name: spark
-    hostname: spark
-    user: root
-    command: bash -c "curl -so /opt/spark/jars/hadoop-aws-3.3.4.jar https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar && curl -so /opt/spark/jars/aws-java-sdk-bundle-1.12.262.jar https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar && sleep infinity"
-    ports:
-      - "4040:4040"
-      - "7077:7077"
-    environment:
-      - SPARK_MODE=master
-      # ── AWS credentials for S3 writes ──────────────────────────────────
-      # Use an .env file or Docker secrets in production — never hardcode keys
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
-    volumes:
-      - ./:/opt/spark-apps
-      - spark_checkpoints:/tmp/checkpoints  # ← fast recovery across restarts
-
-    depends_on:
-      - kafka
-    networks:
-      - spark-kafka-net
+      build:
+        context: .
+        dockerfile: Dockerfile
+      container_name: spark
+      hostname: spark
+      user: root
+      command: sleep infinity
+      ports:
+        - "4040:4040"
+        - "7077:7077"
+      environment:
+        - SPARK_MODE=master
+        - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+        - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+        - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+      volumes:
+        - ./:/opt/spark-apps
+        - spark_checkpoints:/tmp/checkpoints
+      depends_on:
+        - kafka
+      networks:
+        - spark-kafka-net
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
