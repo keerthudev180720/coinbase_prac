@@ -83,12 +83,10 @@ def on_message(ws, message):
         "bid": safe_float("best_bid"),
         "ask": safe_float("best_ask"),
         "volume_24h": safe_float("volume_24h"),
-
         # Rolling 24h OHLC — useful for Kibana range/trend panels
         "open_24h": safe_float("open_24h"),
         "high_24h": safe_float("high_24h"),
         "low_24h": safe_float("low_24h"),
-
         # Coinbase sends ISO 8601 UTC: "2026-03-20T12:00:00.123456Z"
         # Spark TimestampType parses this format correctly as-is.
         "event_time": data.get("time"),
@@ -99,23 +97,18 @@ def on_message(ws, message):
         print(f"⚠️  Skipping incomplete ticker: {event}")
         return
 
-    producer.send(
-        TOPIC,
-        key=event["product_id"],
-        value=event
-    ).add_callback(on_send_success).add_errback(on_send_error)
+    producer.send(TOPIC, key=event["product_id"], value=event).add_callback(
+        on_send_success
+    ).add_errback(on_send_error)
 
-    print(f"📤 {event['product_id']} @ {event['price']}  "
-          f"bid={event['bid']} ask={event['ask']}")
+    print(f"📤 {event['product_id']} @ {event['price']}  " f"bid={event['bid']} ask={event['ask']}")
 
 
 def on_open(ws):
     print("✅ WebSocket connected")
     subscribe_msg = {
         "type": "subscribe",
-        "channels": [
-            {"name": "ticker", "product_ids": PRODUCT_IDS}
-        ]
+        "channels": [{"name": "ticker", "product_ids": PRODUCT_IDS}],
     }
     ws.send(json.dumps(subscribe_msg))
     print(f"📡 Subscribed to: {PRODUCT_IDS}")
