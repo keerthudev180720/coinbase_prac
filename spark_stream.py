@@ -105,7 +105,7 @@ enriched_df = dedup_df \
 # =====================================================
 final_df = enriched_df \
     .filter(col("quality_score") >= 50) \
-    .filter(col("is_suspicious_spread") == False)
+    .filter(~col("is_suspicious_spread"))
 
 base_stream_1m = final_df.withWatermark("event_time", "1 minutes")
 base_stream_5m = final_df.withWatermark("event_time", "6 minutes")
