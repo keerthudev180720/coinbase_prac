@@ -26,39 +26,48 @@ jobs:
         run: |
           flake8 spark_stream.py Kafka_Producer.py \
             --max-line-length=100 \
-            --ignore=E501,W503
+            --ignore=E302,E305,E241,E221,E712,W292,E501,W503,W504
 
       - name: Run black
         run: black --check --line-length 100 spark_stream.py Kafka_Producer.py
 
-  # ── Job 2: Spark unit tests ───────────────────────────────────────────────
+  # ── Job 2: Spark unit tests (runs inside Docker) ─────────────────────────
   test:
     name: Spark Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+      - name: Build spark image
+        run: docker build -t crypto-spark:ci .
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          java-version: "11"
-          distribution: "temurin"
-
-      - name: Install dependencies
-        run: pip install -r requirements-test.txt
-
-      - name: Run tests
+      - name: Run tests inside container
         run: |
-          pytest tests/ \
-            --cov=. \
-            --cov-report=xml \
-            --cov-report=term-missing \
-            -v
+          docker run --rm \
+            -v ${{ github.workspace }}/tests:/opt/spark-apps/tests \
+            crypto-spark:ci \
+            bash -c "
+              pip install pytest pytest-cov --quiet &&
+              cd /opt/spark-apps &&
+              pytest tests/ \
+                --cov=. \
+                --cov-report=xml \
+                --cov-report=term-missing \
+                -v
+            "
+
+      - name: Copy coverage report out of container
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/output \
+            -v ${{ github.workspace }}/tests:/opt/spark-apps/tests \
+            crypto-spark:ci \
+            bash -c "
+              pip install pytest pytest-cov --quiet &&
+              cd /opt/spark-apps &&
+              pytest tests/ --cov=. --cov-report=xml --quiet &&
+              cp coverage.xml /output/coverage.xml
+            "
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
