@@ -47,7 +47,7 @@ jobs:
             -v ${{ github.workspace }}/tests:/opt/spark-apps/tests \
             crypto-spark:ci \
             bash -c "
-              pip install pytest pytest-cov --quiet &&
+              pip install pyspark==3.4.2 pytest pytest-cov --quiet &&
               cd /opt/spark-apps &&
               pytest tests/ \
                 --cov=. \
@@ -63,7 +63,7 @@ jobs:
             -v ${{ github.workspace }}/tests:/opt/spark-apps/tests \
             crypto-spark:ci \
             bash -c "
-              pip install pytest pytest-cov --quiet &&
+              pip install pyspark==3.4.2 pytest pytest-cov --quiet &&
               cd /opt/spark-apps &&
               pytest tests/ --cov=. --cov-report=xml --quiet &&
               cp coverage.xml /output/coverage.xml
